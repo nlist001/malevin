@@ -1,0 +1,57 @@
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1
+      POSTGRES_DB: malevin
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  malevinback:
+    ports:
+      - "3000:3000"
+    build:
+      context: ./back
+      dockerfile: BackDockerfile
+    environment:
+      - NODE_ENV=production
+      - DB_PORT=5432
+      - DB_NAME=malevin
+      - DB_HOST=postgres
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=1
+    depends_on:
+      - postgres
+    networks:
+      - backend
+      - frontend
+
+  malevinfront:
+    ports:
+      - "4000:4000"
+    build:
+      context: ./front
+      dockerfile: FrontDockerfile
+      args:
+        - NEXT_PUBLIC_API_SSR=http://malevinback:3000
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - malevinback 
+    networks:
+      - frontend
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+
+volumes:
+  pgdata:

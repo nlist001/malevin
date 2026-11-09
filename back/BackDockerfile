@@ -1,0 +1,42 @@
+# --- STAGE 1: Install dependencies ---
+    FROM node:24-alpine AS deps
+    WORKDIR /app
+
+    COPY package*.json ./
+
+    RUN npm i
+
+    
+    # --- STAGE 2: Build ---
+    FROM node:24-alpine AS builder
+    WORKDIR /app
+    
+    # Копируем node_modules из этапа deps
+    COPY --from=deps /app/node_modules ./node_modules
+    # Копируем исходный код монорепозитория
+    COPY . .
+
+    RUN npx nest build 
+    
+    # --- STAGE 3: Production Image ---
+    FROM node:24-alpine AS runner
+    WORKDIR /app
+
+    
+    ENV NODE_ENV=production
+
+    # Копируем package.json и устанавливаем ТОЛЬКО prod-зависимости
+    COPY package*.json ./
+    RUN npm i --omit=dev && npm cache clean --force
+    
+    # Копируем только билд конкретного сервиса из этапа builder
+    # В NestJS Monorepo результат билда лежит в dist/apps/SERVICE_NAME
+    ARG SERVICE_NAME
+    COPY --from=builder /app/dist ./dist
+    
+    # Если сервис использует общие ассеты или конфиги, их тоже нужно скопировать здесь
+    
+    EXPOSE 3000
+    
+    # Запуск скомпилированного кода
+    CMD ["node", "dist/main"]
